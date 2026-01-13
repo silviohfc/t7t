@@ -34,10 +34,11 @@ type KeyMap struct {
 	CompleteProject key.Binding
 
 	// General
-	Help   key.Binding
-	Quit   key.Binding
-	Enter  key.Binding
-	Escape key.Binding
+	Help     key.Binding
+	Quit     key.Binding
+	Enter    key.Binding
+	Escape   key.Binding
+	SaveForm key.Binding
 }
 
 var Keys = KeyMap{
@@ -153,6 +154,10 @@ var Keys = KeyMap{
 	Escape: key.NewBinding(
 		key.WithKeys("esc"),
 		key.WithHelp("esc", "cancelar"),
+	),
+	SaveForm: key.NewBinding(
+		key.WithKeys("shift+enter", "ctrl+s"),
+		key.WithHelp("shift+enter/ctrl+s", "salvar"),
 	),
 }
 

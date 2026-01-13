@@ -63,14 +63,18 @@ type App struct {
 	projectIndex int
 
 	taskListViewport         viewport.Model
-	taskDetailViewport       viewport.Model
 	projectListViewport      viewport.Model
 	taskFormModalViewport    viewport.Model
 	taskFormProjectsViewport viewport.Model
 	projectsModalViewport    viewport.Model
 	helpModalViewport        viewport.Model
 
-	detailFocused bool
+	taskListViewport         viewport.Model
+	projectListViewport      viewport.Model
+	taskFormModalViewport    viewport.Model
+	taskFormProjectsViewport viewport.Model
+	projectsModalViewport    viewport.Model
+	helpModalViewport        viewport.Model
 
 	lastModal ModalType
 
@@ -149,14 +153,12 @@ func NewApp(store *model.Store) *App {
 		},
 		showConfetti:             false,
 		taskListViewport:         viewport.New(0, 0),
-		taskDetailViewport:       viewport.New(0, 0),
 		projectListViewport:      viewport.New(0, 0),
 		taskFormModalViewport:    viewport.New(0, 0),
 		taskFormProjectsViewport: viewport.New(0, 0),
 		projectsModalViewport:    viewport.New(0, 0),
 		helpModalViewport:        viewport.New(0, 0),
 		lastModal:                ModalNone,
-		detailFocused:            false,
 	}
 }
 
@@ -196,26 +198,9 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.confettiSystem.Frame.Height = msg.Height
 
 		listWidth := a.width*60/100 - 4
-		detailWidth := a.width*40/100 - 4
 		contentHeight := a.height - 10
 		a.taskListViewport = viewport.New(listWidth, contentHeight)
-		a.taskDetailViewport = viewport.New(detailWidth, contentHeight)
 		a.projectListViewport = viewport.New(a.width-4, contentHeight)
-
-		// Viewport para lista de projetos no modal de tarefa
-		projectsListHeight := 6
-		if a.height < 30 {
-			projectsListHeight = 4
-		}
-		a.taskFormProjectsViewport = viewport.New(40, projectsListHeight)
-
-		// Viewport para modais
-		modalHeight := a.height - 10
-		if modalHeight < 10 {
-			modalHeight = 10
-		}
-		a.helpModalViewport = viewport.New(50, modalHeight)
-		a.projectsModalViewport = viewport.New(40, modalHeight)
 
 		return a, nil
 
@@ -246,7 +231,7 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return a, nil
 
-		case msg.String() == "P":
+		case key.Matches(msg, keys.Keys.Projects):
 			if a.viewMode == ViewTasks {
 				a.viewMode = ViewProjects
 				a.projectIndex = 0
@@ -268,46 +253,16 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (a *App) handleTasksInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	tasks := a.store.GetTasksByCategory(a.categories[a.activeTab])
-	keyStr := msg.String()
-
-	// Quando o painel de detalhes está focado
-	if a.detailFocused {
-		switch {
-		case keyStr == "h" || keyStr == "left":
-			a.detailFocused = false
-			return a, nil
-		case key.Matches(msg, keys.Keys.Down):
-			a.taskDetailViewport.LineDown(1)
-			return a, nil
-		case key.Matches(msg, keys.Keys.Up):
-			a.taskDetailViewport.LineUp(1)
-			return a, nil
-		case key.Matches(msg, keys.Keys.Escape):
-			a.detailFocused = false
-			return a, nil
-		}
-		// Permitir outras ações mesmo com detalhe focado
-	}
-
-	// "l" ou "right" foca no painel de detalhes
-	if !a.detailFocused && (keyStr == "l" || keyStr == "right") {
-		a.detailFocused = true
-		return a, nil
-	}
 
 	switch {
 	case key.Matches(msg, keys.Keys.NextTab):
 		a.activeTab = (a.activeTab + 1) % len(a.tabs)
 		a.taskIndex = 0
-		a.detailFocused = false
-		a.taskDetailViewport.GotoTop()
 		return a, nil
 
 	case key.Matches(msg, keys.Keys.PrevTab):
 		a.activeTab = (a.activeTab - 1 + len(a.tabs)) % len(a.tabs)
 		a.taskIndex = 0
-		a.detailFocused = false
-		a.taskDetailViewport.GotoTop()
 		return a, nil
 
 	case key.Matches(msg, keys.Keys.Down):
@@ -319,7 +274,6 @@ func (a *App) handleTasksInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			} else {
 				a.taskListViewport.LineDown(1)
 			}
-			a.taskDetailViewport.GotoTop()
 		}
 		return a, nil
 
@@ -332,7 +286,6 @@ func (a *App) handleTasksInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			} else {
 				a.taskListViewport.LineUp(1)
 			}
-			a.taskDetailViewport.GotoTop()
 		}
 		return a, nil
 
@@ -536,22 +489,12 @@ func (a *App) handleProjectsInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (a *App) handleModalInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
-	keyStr := msg.String()
 
 	if key.Matches(msg, keys.Keys.Escape) {
 		a.modal = ModalNone
 		a.nameInput.Blur()
 		a.descInput.Blur()
 		return a, nil
-	}
-
-	// Shift+Enter ou Ctrl+S salva formulários
-	if keyStr == "shift+enter" || keyStr == "ctrl+s" {
-		if a.modal == ModalNewTask || a.modal == ModalEditTask ||
-			a.modal == ModalNewProject || a.modal == ModalEditProject ||
-			a.modal == ModalAssociateProjects {
-			return a.confirmModal()
-		}
 	}
 
 	if a.modal == ModalHelp {
@@ -647,10 +590,11 @@ func (a *App) handleModalInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 
 	if a.modal == ModalNewTask || a.modal == ModalEditTask {
+		keyStr := msg.String()
 		projects := a.store.GetProjects()
 
 		if a.focusedInput == 2 {
-			switch keyStr := msg.String(); keyStr {
+			switch keyStr {
 			case "tab":
 				a.focusedInput = 0
 				a.nameInput.Focus()
@@ -690,7 +634,7 @@ func (a *App) handleModalInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 		}
 
-		switch msg.String() {
+		switch keyStr {
 		case "tab":
 			if a.focusedInput == 0 {
 				a.focusedInput = 1
@@ -879,20 +823,10 @@ func (a *App) viewTasks() string {
 
 	listContent := a.renderTaskList(tasks, listWidth, contentHeight)
 	a.taskListViewport.SetContent(listContent)
-
-	listStyle := ListPanelStyle.Width(listWidth).Height(contentHeight)
-	detailStyle := DetailPanelStyle.Width(detailWidth).Height(contentHeight)
-
-	if a.detailFocused {
-		listStyle = listStyle.BorderForeground(lipgloss.Color("240"))
-		detailStyle = detailStyle.BorderForeground(lipgloss.Color("212"))
-	}
-
-	listPanel := listStyle.Render(a.taskListViewport.View())
+	listPanel := ListPanelStyle.Width(listWidth).Height(contentHeight).Render(a.taskListViewport.View())
 
 	detailContent := a.renderTaskDetail(tasks, detailWidth, contentHeight)
-	a.taskDetailViewport.SetContent(detailContent)
-	detailPanel := detailStyle.Render(a.taskDetailViewport.View())
+	detailPanel := DetailPanelStyle.Width(detailWidth).Height(contentHeight).Render(detailContent)
 
 	panels := lipgloss.JoinHorizontal(lipgloss.Top, listPanel, detailPanel)
 	b.WriteString(panels)
@@ -1132,23 +1066,17 @@ func (a *App) renderStatusBar() string {
 		parts = append(parts, StatusMessageStyle.Render(a.statusMsg))
 	}
 
-	var helpText string
-	if a.detailFocused {
-		helpText = HelpKeyStyle.Render("j/k") + HelpDescStyle.Render(":scroll ") +
-			HelpKeyStyle.Render("h") + HelpDescStyle.Render(":voltar ") +
-			HelpKeyStyle.Render("?") + HelpDescStyle.Render(":ajuda ") +
-			HelpKeyStyle.Render("q") + HelpDescStyle.Render(":sair")
-	} else {
-		helpText = HelpKeyStyle.Render("a") + HelpDescStyle.Render(":nova ") +
-			HelpKeyStyle.Render("space") + HelpDescStyle.Render(":concluir ") +
-			HelpKeyStyle.Render("e") + HelpDescStyle.Render(":editar ") +
-			HelpKeyStyle.Render("l") + HelpDescStyle.Render(":detalhes ") +
-			HelpKeyStyle.Render("?") + HelpDescStyle.Render(":ajuda ") +
-			HelpKeyStyle.Render("q") + HelpDescStyle.Render(":sair")
-	}
+	helpText := HelpKeyStyle.Render("a") + HelpDescStyle.Render(":nova ") +
+		HelpKeyStyle.Render("space") + HelpDescStyle.Render(":concluir ") +
+		HelpKeyStyle.Render("e") + HelpDescStyle.Render(":editar ") +
+		HelpKeyStyle.Render("p") + HelpDescStyle.Render(":projetos ") +
+		HelpKeyStyle.Render("?") + HelpDescStyle.Render(":ajuda ") +
+		HelpKeyStyle.Render("q") + HelpDescStyle.Render(":sair")
 
 	parts = append(parts, helpText)
-	return StatusBarStyle.Render(strings.Join(parts, " | "))
+	b.WriteString(StatusBarStyle.Render(strings.Join(parts, " | ")))
+
+	return b.String()
 }
 
 func (a *App) viewModal(background string) string {
@@ -1221,6 +1149,12 @@ func (a *App) renderTaskForm(title string) string {
 	b.WriteString("\n")
 
 	projects := a.store.GetProjects()
+
+	b.WriteString("\n")
+
+	if a.focusedInput == 2 {
+		b.WriteString(a.helpMsg)
+	}
 
 	if len(projects) == 0 {
 		b.WriteString(HelpDescStyle.Render("  (nenhum projeto cadastrado)"))
