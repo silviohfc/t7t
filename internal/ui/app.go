@@ -1474,8 +1474,8 @@ func (a *App) renderHelpModal() string {
 
 	helpItems := [][]string{
 		{m.HelpNavSection, ""},
-		{"j/k ou setas", m.HelpNavList},
-		{"Tab/Shift+Tab", m.HelpNavTabs},
+		{m.HelpKeyNavList, m.HelpNavList},
+		{m.HelpKeyNavTabs, m.HelpNavTabs},
 		{"P", m.HelpNavProjects},
 		{"", ""},
 		{m.HelpTaskSection, ""},
@@ -1483,7 +1483,7 @@ func (a *App) renderHelpModal() string {
 		{"A", m.HelpTaskNewGen},
 		{"e", m.HelpTaskEdit},
 		{"d", m.HelpTaskDelete},
-		{"space ou x", m.HelpTaskComplete},
+		{m.HelpKeyComplete, m.HelpTaskComplete},
 		{"D", m.HelpTaskDeleteDone},
 		{"p", m.HelpTaskAssoc},
 		{"", ""},
@@ -1497,7 +1497,7 @@ func (a *App) renderHelpModal() string {
 		{"a", m.HelpProjNew},
 		{"e", m.HelpProjEdit},
 		{"d", m.HelpProjDelete},
-		{"space ou X", m.HelpProjComplete},
+		{m.HelpKeyCompleteProj, m.HelpProjComplete},
 		{"", ""},
 		{m.HelpFormSection, ""},
 		{"Tab", m.HelpFormTab},
@@ -1507,7 +1507,7 @@ func (a *App) renderHelpModal() string {
 		{m.HelpGeneralSection, ""},
 		{"?", m.HelpGeneralHelp},
 		{"L", m.HelpGeneralLanguage},
-		{"q ou Ctrl+C", m.HelpGeneralQuit},
+		{m.HelpKeyQuit, m.HelpGeneralQuit},
 	}
 
 	for _, item := range helpItems {

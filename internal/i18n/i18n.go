@@ -134,6 +134,13 @@ type Messages struct {
 	KeySaveForm      string `json:"key_save"`
 	KeyLanguage      string `json:"key_language"`
 
+	// Help modal keys (left column)
+	HelpKeyNavList      string `json:"help_key_nav_list"`
+	HelpKeyNavTabs      string `json:"help_key_nav_tabs"`
+	HelpKeyComplete     string `json:"help_key_complete"`
+	HelpKeyCompleteProj string `json:"help_key_complete_proj"`
+	HelpKeyQuit         string `json:"help_key_quit"`
+
 	// Help modal sections
 	HelpNavSection      string `json:"help_nav_section"`
 	HelpNavList         string `json:"help_nav_list"`
@@ -313,6 +320,13 @@ var ptBR = &Messages{
 	KeySaveForm:      "salvar",
 	KeyLanguage:      "idioma",
 
+	// Help modal keys (left column)
+	HelpKeyNavList:      "j/k ou setas",
+	HelpKeyNavTabs:      "Tab/Shift+Tab",
+	HelpKeyComplete:     "space ou x",
+	HelpKeyCompleteProj: "space ou X",
+	HelpKeyQuit:         "q ou Ctrl+C",
+
 	// Help modal sections
 	HelpNavSection:      "Navegacao",
 	HelpNavList:         "Mover na lista",
@@ -485,6 +499,13 @@ var en = &Messages{
 	KeyEscape:        "cancel",
 	KeySaveForm:      "save",
 	KeyLanguage:      "language",
+
+	// Help modal keys (left column)
+	HelpKeyNavList:      "j/k or arrows",
+	HelpKeyNavTabs:      "Tab/Shift+Tab",
+	HelpKeyComplete:     "space or x",
+	HelpKeyCompleteProj: "space or X",
+	HelpKeyQuit:         "q or Ctrl+C",
 
 	// Help modal sections
 	HelpNavSection:      "Navigation",
