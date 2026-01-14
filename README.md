@@ -13,6 +13,7 @@ A simple, fast, and no-frills terminal task manager. Built for quick capture and
 - **Context Tags**: Use `@context` in task names for visual highlighting (e.g., `@work`, `@personal`)
 - **Markdown Descriptions**: Full markdown support in task descriptions
 - **Local Storage**: All data stored locally in JSON
+- **Multi-language Support**: Available in English and Portuguese (Brazil)
 
 ## Installation
 
@@ -123,6 +124,15 @@ Fix bug in auth @project-x
 ```
 
 Context tags are highlighted in a different color, making them easy to spot.
+
+## Language / Idioma
+
+t7t supports multiple languages. Press `L` (Shift+L) to open the language selection modal and choose between:
+
+- **English**
+- **Portugues (Brasil)**
+
+Your language preference is saved automatically in `~/.config/t7t/language.json`.
 
 ## Built With
 

@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"t7t/internal/i18n"
 	"t7t/internal/keys"
 	"t7t/internal/model"
 
@@ -50,6 +51,7 @@ const (
 	ModalAssociateProjects
 	ModalHelp
 	ModalConfirmDelete
+	ModalLanguage
 )
 
 type App struct {
@@ -99,17 +101,21 @@ type App struct {
 	confettiSystem  *simulation.System
 	showConfetti    bool
 	confettiEndTime time.Time
+
+	languageIndex int
 }
 
 func NewApp(store *model.Store) *App {
+	msg := i18n.Get()
+
 	nameInput := textinput.New()
-	nameInput.Placeholder = "Nome..."
+	nameInput.Placeholder = msg.PlaceholderName
 	nameInput.CharLimit = 100
 	nameInput.Width = 40
 	nameInput.Blur()
 
 	descInput := textarea.New()
-	descInput.Placeholder = "Descricao (suporta Markdown)..."
+	descInput.Placeholder = msg.PlaceholderDesc
 	descInput.CharLimit = 2000
 	descInput.SetWidth(40)
 	descInput.SetHeight(6)
@@ -126,7 +132,7 @@ func NewApp(store *model.Store) *App {
 	return &App{
 		store:    store,
 		viewMode: ViewTasks,
-		tabs:     []string{"Hoje", "Essa Semana", "Nao Urgente", "Lista Geral"},
+		tabs:     []string{msg.TabToday, msg.TabWeek, msg.TabNotUrgent, msg.TabGeneral},
 		categories: []model.Category{
 			model.CategoryToday,
 			model.CategoryWeek,
@@ -158,7 +164,16 @@ func NewApp(store *model.Store) *App {
 		helpModalViewport:        viewport.New(0, 0),
 		lastModal:                ModalNone,
 		detailFocused:            false,
+		languageIndex:            0,
 	}
+}
+
+func (a *App) updateTexts() {
+	msg := i18n.Get()
+	a.tabs = []string{msg.TabToday, msg.TabWeek, msg.TabNotUrgent, msg.TabGeneral}
+	a.nameInput.Placeholder = msg.PlaceholderName
+	a.descInput.Placeholder = msg.PlaceholderDesc
+	keys.UpdateKeybindings()
 }
 
 func (a *App) Init() tea.Cmd {
@@ -253,6 +268,21 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return a, nil
 
+		case key.Matches(msg, keys.Keys.Language):
+			if a.modal == ModalNone {
+				a.modal = ModalLanguage
+				// Set current language as selected
+				langs := i18n.AvailableLanguages()
+				currentLang := i18n.GetLanguage()
+				for i, lang := range langs {
+					if lang == currentLang {
+						a.languageIndex = i
+						break
+					}
+				}
+			}
+			return a, nil
+
 		case msg.String() == "P":
 			if a.viewMode == ViewTasks {
 				a.viewMode = ViewProjects
@@ -276,8 +306,9 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (a *App) handleTasksInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	tasks := a.store.GetTasksByCategory(a.categories[a.activeTab])
 	keyStr := msg.String()
+	m := i18n.Get()
 
-	// Quando o painel de detalhes está focado
+	// Quando o painel de detalhes esta focado
 	if a.detailFocused {
 		switch {
 		case keyStr == "h" || keyStr == "left":
@@ -293,7 +324,7 @@ func (a *App) handleTasksInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			a.detailFocused = false
 			return a, nil
 		}
-		// Permitir outras ações mesmo com detalhe focado
+		// Permitir outras acoes mesmo com detalhe focado
 	}
 
 	// "l" ou "right" foca no painel de detalhes
@@ -401,13 +432,13 @@ func (a *App) handleTasksInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			task.ToggleComplete()
 			a.store.UpdateTask(task)
 			if task.Completed {
-				a.statusMsg = "Tarefa concluida"
+				a.statusMsg = m.StatusTaskCompleted
 				if a.activeTab == 0 && a.checkAllTodayTasksCompleted() {
-					a.statusMsg = "Parabens! Todas as tarefas de hoje concluidas!"
+					a.statusMsg = m.StatusAllTodayDone
 					return a, a.startConfetti()
 				}
 			} else {
-				a.statusMsg = "Tarefa reaberta"
+				a.statusMsg = m.StatusTaskReopened
 			}
 		}
 		return a, nil
@@ -424,7 +455,7 @@ func (a *App) handleTasksInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			a.modal = ModalConfirmDelete
 			a.deleteType = "completed"
 			a.deleteID = string(category)
-			a.deleteName = fmt.Sprintf("%d tarefa(s) concluida(s)", count)
+			a.deleteName = fmt.Sprintf(m.DeleteCountFormat, count)
 		}
 		return a, nil
 
@@ -455,6 +486,7 @@ func (a *App) handleTasksInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (a *App) moveTask(tasks []*model.Task, category model.Category) (tea.Model, tea.Cmd) {
+	m := i18n.Get()
 	if len(tasks) > 0 && a.taskIndex < len(tasks) {
 		task := tasks[a.taskIndex]
 		task.SetCategory(category)
@@ -462,13 +494,14 @@ func (a *App) moveTask(tasks []*model.Task, category model.Category) (tea.Model,
 		if a.taskIndex >= len(tasks)-1 && a.taskIndex > 0 {
 			a.taskIndex--
 		}
-		a.statusMsg = fmt.Sprintf("Tarefa movida para %s", category.String())
+		a.statusMsg = fmt.Sprintf(m.StatusTaskMoved, model.CategoryString(category))
 	}
 	return a, nil
 }
 
 func (a *App) handleProjectsInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	projects := a.store.GetProjects()
+	m := i18n.Get()
 
 	switch {
 	case key.Matches(msg, keys.Keys.Down):
@@ -530,9 +563,9 @@ func (a *App) handleProjectsInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			proj.ToggleComplete()
 			a.store.UpdateProject(proj)
 			if proj.Completed {
-				a.statusMsg = "Projeto concluido"
+				a.statusMsg = m.StatusProjectCompleted
 			} else {
-				a.statusMsg = "Projeto reaberto"
+				a.statusMsg = m.StatusProjectReopened
 			}
 		}
 		return a, nil
@@ -544,6 +577,7 @@ func (a *App) handleProjectsInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 func (a *App) handleModalInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	keyStr := msg.String()
+	m := i18n.Get()
 
 	if key.Matches(msg, keys.Keys.Escape) {
 		a.modal = ModalNone
@@ -552,7 +586,7 @@ func (a *App) handleModalInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return a, nil
 	}
 
-	// Shift+Enter ou Ctrl+S salva formulários
+	// Shift+Enter ou Ctrl+S salva formularios
 	if keyStr == "shift+enter" || keyStr == "ctrl+s" {
 		if a.modal == ModalNewTask || a.modal == ModalEditTask ||
 			a.modal == ModalNewProject || a.modal == ModalEditProject ||
@@ -573,6 +607,22 @@ func (a *App) handleModalInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return a, nil
 	}
 
+	if a.modal == ModalLanguage {
+		langs := i18n.AvailableLanguages()
+		switch {
+		case key.Matches(msg, keys.Keys.Down):
+			a.languageIndex = (a.languageIndex + 1) % len(langs)
+		case key.Matches(msg, keys.Keys.Up):
+			a.languageIndex = (a.languageIndex - 1 + len(langs)) % len(langs)
+		case key.Matches(msg, keys.Keys.Enter):
+			i18n.SetLanguage(langs[a.languageIndex])
+			a.updateTexts()
+			a.statusMsg = i18n.Get().LanguageChanged
+			a.modal = ModalNone
+		}
+		return a, nil
+	}
+
 	if a.modal == ModalConfirmDelete {
 		switch msg.String() {
 		case "y", "Y", "s", "S", "enter":
@@ -582,19 +632,19 @@ func (a *App) handleModalInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				if a.taskIndex >= len(tasks) && a.taskIndex > 0 {
 					a.taskIndex--
 				}
-				a.statusMsg = "Tarefa deletada"
+				a.statusMsg = m.StatusTaskDeleted
 			} else if a.deleteType == "project" {
 				a.store.DeleteProject(a.deleteID)
 				projects := a.store.GetProjects()
 				if a.projectIndex >= len(projects) && a.projectIndex > 0 {
 					a.projectIndex--
 				}
-				a.statusMsg = "Projeto deletado"
+				a.statusMsg = m.StatusProjectDeleted
 			} else if a.deleteType == "completed" {
 				category := model.Category(a.deleteID)
 				a.store.DeleteCompletedTasks(category)
 				a.taskIndex = 0
-				a.statusMsg = "Tarefas concluidas deletadas"
+				a.statusMsg = m.StatusCompletedDeleted
 			}
 			a.modal = ModalNone
 			a.deleteType = ""
@@ -741,6 +791,8 @@ func (a *App) handleModalInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (a *App) confirmModal() (tea.Model, tea.Cmd) {
+	m := i18n.Get()
+
 	getSelectedProjectIDs := func() []string {
 		var ids []string
 		for pid, selected := range a.selectedProjs {
@@ -758,7 +810,7 @@ func (a *App) confirmModal() (tea.Model, tea.Cmd) {
 			task := model.NewTask(name, a.descInput.Value(), a.categories[a.activeTab])
 			task.ProjectIDs = getSelectedProjectIDs()
 			a.store.AddTask(task)
-			a.statusMsg = "Tarefa criada"
+			a.statusMsg = m.StatusTaskCreated
 		}
 
 	case ModalEditTask:
@@ -768,7 +820,7 @@ func (a *App) confirmModal() (tea.Model, tea.Cmd) {
 				task.Update(name, a.descInput.Value())
 				task.ProjectIDs = getSelectedProjectIDs()
 				a.store.UpdateTask(task)
-				a.statusMsg = "Tarefa atualizada"
+				a.statusMsg = m.StatusTaskUpdated
 			}
 		}
 
@@ -777,7 +829,7 @@ func (a *App) confirmModal() (tea.Model, tea.Cmd) {
 		if name != "" {
 			proj := model.NewProject(name)
 			a.store.AddProject(proj)
-			a.statusMsg = "Projeto criado"
+			a.statusMsg = m.StatusProjectCreated
 		}
 
 	case ModalEditProject:
@@ -786,7 +838,7 @@ func (a *App) confirmModal() (tea.Model, tea.Cmd) {
 			if proj := a.store.GetProject(a.editingProjectID); proj != nil {
 				proj.Update(name)
 				a.store.UpdateProject(proj)
-				a.statusMsg = "Projeto atualizado"
+				a.statusMsg = m.StatusProjectUpdated
 			}
 		}
 
@@ -801,7 +853,7 @@ func (a *App) confirmModal() (tea.Model, tea.Cmd) {
 				}
 				task.SetProjects(projectIDs)
 				a.store.UpdateTask(task)
-				a.statusMsg = "Projetos associados"
+				a.statusMsg = m.StatusProjectsAssoc
 			}
 		}
 	}
@@ -812,7 +864,7 @@ func (a *App) confirmModal() (tea.Model, tea.Cmd) {
 
 func (a *App) View() string {
 	if a.width == 0 {
-		return "Carregando..."
+		return i18n.Get().Loading
 	}
 
 	var content string
@@ -926,6 +978,7 @@ func (a *App) viewTasks() string {
 
 func (a *App) renderTabs() string {
 	var tabs []string
+	m := i18n.Get()
 
 	for i, tab := range a.tabs {
 		var style lipgloss.Style
@@ -938,7 +991,7 @@ func (a *App) renderTabs() string {
 	}
 
 	projStyle := InactiveTabStyle
-	tabs = append(tabs, TabGapStyle.Render(" | "), projStyle.Render("[P] Projetos"))
+	tabs = append(tabs, TabGapStyle.Render(" | "), projStyle.Render("[P] "+m.KeyProjects))
 
 	return lipgloss.JoinHorizontal(lipgloss.Center, tabs...)
 }
@@ -976,8 +1029,10 @@ func renderNameWithContexts(name string, baseStyle lipgloss.Style) string {
 }
 
 func (a *App) renderTaskList(tasks []*model.Task, width, height int) string {
+	m := i18n.Get()
+
 	if len(tasks) == 0 {
-		return NormalItemStyle.Render("Nenhuma tarefa nesta lista.\n\nPressione 'a' para criar uma nova tarefa.")
+		return NormalItemStyle.Render(m.EmptyTaskList)
 	}
 
 	var lines []string
@@ -1037,8 +1092,10 @@ func (a *App) renderTaskList(tasks []*model.Task, width, height int) string {
 }
 
 func (a *App) renderTaskDetail(tasks []*model.Task, width, height int) string {
+	m := i18n.Get()
+
 	if len(tasks) == 0 || a.taskIndex >= len(tasks) {
-		return NormalItemStyle.Render("Selecione uma tarefa para ver detalhes")
+		return NormalItemStyle.Render(m.EmptyTaskDetail)
 	}
 
 	task := tasks[a.taskIndex]
@@ -1047,18 +1104,18 @@ func (a *App) renderTaskDetail(tasks []*model.Task, width, height int) string {
 	b.WriteString(DetailTitleStyle.Width(width).Render(task.Name))
 	b.WriteString("\n\n")
 
-	b.WriteString(DetailLabelStyle.Render("Status: "))
+	b.WriteString(DetailLabelStyle.Render(m.LabelStatus))
 	if task.Completed {
-		b.WriteString(StatusMessageStyle.Render("Concluida"))
+		b.WriteString(StatusMessageStyle.Render(m.LabelCompleted))
 	} else {
-		b.WriteString(DetailValueStyle.Render("Pendente"))
+		b.WriteString(DetailValueStyle.Render(m.LabelPending))
 	}
 	b.WriteString("\n\n")
 
-	b.WriteString(DetailLabelStyle.Render("Descricao:"))
+	b.WriteString(DetailLabelStyle.Render(m.LabelDescription))
 	b.WriteString("\n")
 	if task.Description == "" {
-		b.WriteString(DetailValueStyle.Render("(sem descricao)"))
+		b.WriteString(DetailValueStyle.Render(m.LabelNoDesc))
 	} else {
 		if a.mdRenderer != nil {
 			rendered, err := a.mdRenderer.Render(task.Description)
@@ -1071,11 +1128,11 @@ func (a *App) renderTaskDetail(tasks []*model.Task, width, height int) string {
 	}
 	b.WriteString("\n\n")
 
-	b.WriteString(DetailLabelStyle.Render("Projetos:"))
+	b.WriteString(DetailLabelStyle.Render(m.LabelProjects))
 	b.WriteString("\n")
 	projectNames := a.store.GetProjectNames(task.ProjectIDs)
 	if len(projectNames) == 0 {
-		b.WriteString(DetailValueStyle.Render("(nenhum projeto)"))
+		b.WriteString(DetailValueStyle.Render(m.LabelNoProjects))
 	} else {
 		var projLines []string
 		for _, name := range projectNames {
@@ -1088,9 +1145,11 @@ func (a *App) renderTaskDetail(tasks []*model.Task, width, height int) string {
 }
 
 func (a *App) viewProjects() string {
+	m := i18n.Get()
+
 	// Render header elements
 	logo := LogoStyle.Render(LogoArt)
-	tab := InactiveTabStyle.Render("[P] Voltar para Tarefas")
+	tab := InactiveTabStyle.Render(m.ProjectsBackToTasks)
 
 	// Calculate heights
 	logoHeight := lipgloss.Height(logo)
@@ -1111,7 +1170,7 @@ func (a *App) viewProjects() string {
 	var panel string
 
 	if len(projects) == 0 {
-		panel = NormalItemStyle.Render("Nenhum projeto cadastrado.\n\nPressione 'a' para criar um novo projeto.")
+		panel = NormalItemStyle.Render(m.EmptyProjectList)
 	} else {
 		listWidth := a.width - 4
 		listContent := a.renderProjectList(projects, listWidth)
@@ -1125,12 +1184,12 @@ func (a *App) viewProjects() string {
 		parts = append(parts, StatusMessageStyle.Render(a.statusMsg))
 	}
 
-	helpText := HelpKeyStyle.Render("a") + HelpDescStyle.Render(":novo ") +
-		HelpKeyStyle.Render("e") + HelpDescStyle.Render(":editar ") +
-		HelpKeyStyle.Render("d") + HelpDescStyle.Render(":deletar ") +
-		HelpKeyStyle.Render("space") + HelpDescStyle.Render(":concluir ") +
-		HelpKeyStyle.Render("P") + HelpDescStyle.Render(":voltar ") +
-		HelpKeyStyle.Render("q") + HelpDescStyle.Render(":sair")
+	helpText := HelpKeyStyle.Render("a") + HelpDescStyle.Render(":"+m.HelpNew+" ") +
+		HelpKeyStyle.Render("e") + HelpDescStyle.Render(":"+m.HelpEdit+" ") +
+		HelpKeyStyle.Render("d") + HelpDescStyle.Render(":"+m.HelpDelete+" ") +
+		HelpKeyStyle.Render("space") + HelpDescStyle.Render(":"+m.HelpComplete+" ") +
+		HelpKeyStyle.Render("P") + HelpDescStyle.Render(":"+m.HelpBack+" ") +
+		HelpKeyStyle.Render("q") + HelpDescStyle.Render(":"+m.HelpQuit)
 
 	parts = append(parts, helpText)
 	statusBar := StatusBarStyle.Render(strings.Join(parts, " | "))
@@ -1147,6 +1206,7 @@ func (a *App) viewProjects() string {
 }
 
 func (a *App) renderProjectList(projects []*model.Project, width int) string {
+	m := i18n.Get()
 	var lines []string
 
 	for i, proj := range projects {
@@ -1185,7 +1245,7 @@ func (a *App) renderProjectList(projects []*model.Project, width int) string {
 		line += style.Render(name)
 
 		if taskCount > 0 {
-			line += " " + ProjectBadgeStyle.Render(fmt.Sprintf("%d tarefas", taskCount))
+			line += " " + ProjectBadgeStyle.Render(fmt.Sprintf(m.ProjectsTaskCount, taskCount))
 		}
 
 		lines = append(lines, line)
@@ -1195,6 +1255,7 @@ func (a *App) renderProjectList(projects []*model.Project, width int) string {
 }
 
 func (a *App) renderStatusBar() string {
+	m := i18n.Get()
 	var parts []string
 
 	if a.statusMsg != "" {
@@ -1203,17 +1264,17 @@ func (a *App) renderStatusBar() string {
 
 	var helpText string
 	if a.detailFocused {
-		helpText = HelpKeyStyle.Render("j/k") + HelpDescStyle.Render(":scroll ") +
-			HelpKeyStyle.Render("h") + HelpDescStyle.Render(":voltar ") +
-			HelpKeyStyle.Render("?") + HelpDescStyle.Render(":ajuda ") +
-			HelpKeyStyle.Render("q") + HelpDescStyle.Render(":sair")
+		helpText = HelpKeyStyle.Render("j/k") + HelpDescStyle.Render(":"+m.HelpScroll+" ") +
+			HelpKeyStyle.Render("h") + HelpDescStyle.Render(":"+m.HelpBack+" ") +
+			HelpKeyStyle.Render("?") + HelpDescStyle.Render(":"+m.HelpHelp+" ") +
+			HelpKeyStyle.Render("q") + HelpDescStyle.Render(":"+m.HelpQuit)
 	} else {
-		helpText = HelpKeyStyle.Render("a") + HelpDescStyle.Render(":nova ") +
-			HelpKeyStyle.Render("space") + HelpDescStyle.Render(":concluir ") +
-			HelpKeyStyle.Render("e") + HelpDescStyle.Render(":editar ") +
-			HelpKeyStyle.Render("l") + HelpDescStyle.Render(":detalhes ") +
-			HelpKeyStyle.Render("?") + HelpDescStyle.Render(":ajuda ") +
-			HelpKeyStyle.Render("q") + HelpDescStyle.Render(":sair")
+		helpText = HelpKeyStyle.Render("a") + HelpDescStyle.Render(":"+m.HelpNew+" ") +
+			HelpKeyStyle.Render("space") + HelpDescStyle.Render(":"+m.HelpComplete+" ") +
+			HelpKeyStyle.Render("e") + HelpDescStyle.Render(":"+m.HelpEdit+" ") +
+			HelpKeyStyle.Render("l") + HelpDescStyle.Render(":"+m.HelpDetails+" ") +
+			HelpKeyStyle.Render("?") + HelpDescStyle.Render(":"+m.HelpHelp+" ") +
+			HelpKeyStyle.Render("q") + HelpDescStyle.Render(":"+m.HelpQuit)
 	}
 
 	parts = append(parts, helpText)
@@ -1225,19 +1286,21 @@ func (a *App) viewModal(background string) string {
 
 	switch a.modal {
 	case ModalNewTask:
-		modalContent = a.renderTaskForm("Nova Tarefa")
+		modalContent = a.renderTaskForm(i18n.Get().ModalNewTask)
 	case ModalEditTask:
-		modalContent = a.renderTaskForm("Editar Tarefa")
+		modalContent = a.renderTaskForm(i18n.Get().ModalEditTask)
 	case ModalNewProject:
-		modalContent = a.renderProjectForm("Novo Projeto")
+		modalContent = a.renderProjectForm(i18n.Get().ModalNewProject)
 	case ModalEditProject:
-		modalContent = a.renderProjectForm("Editar Projeto")
+		modalContent = a.renderProjectForm(i18n.Get().ModalEditProject)
 	case ModalAssociateProjects:
 		modalContent = a.renderAssociateProjectsModal()
 	case ModalHelp:
 		modalContent = a.renderHelpModal()
 	case ModalConfirmDelete:
 		modalContent = a.renderConfirmDeleteModal()
+	case ModalLanguage:
+		modalContent = a.renderLanguageModal()
 	}
 
 	modal := ModalStyle.Render(modalContent)
@@ -1259,32 +1322,33 @@ func (a *App) viewModal(background string) string {
 }
 
 func (a *App) renderTaskForm(title string) string {
+	m := i18n.Get()
 	var b strings.Builder
 
 	b.WriteString(ModalTitleStyle.Render(title))
 	b.WriteString("\n\n")
 
-	nameLabel := "Nome:"
+	nameLabel := m.FormName
 	if a.focusedInput == 0 {
-		nameLabel = "> Nome:"
+		nameLabel = "> " + m.FormName
 	}
 	b.WriteString(InputLabelStyle.Render(nameLabel))
 	b.WriteString("\n")
 	b.WriteString(a.nameInput.View())
 	b.WriteString("\n\n")
 
-	descLabel := "Descricao (Markdown):"
+	descLabel := m.FormDescMarkdown
 	if a.focusedInput == 1 {
-		descLabel = "> Descricao (Markdown):"
+		descLabel = "> " + m.FormDescMarkdown
 	}
 	b.WriteString(InputLabelStyle.Render(descLabel))
 	b.WriteString("\n")
 	b.WriteString(a.descInput.View())
 	b.WriteString("\n\n")
 
-	projLabel := "Projetos:"
+	projLabel := m.LabelProjects
 	if a.focusedInput == 2 {
-		projLabel = "> Projetos:"
+		projLabel = "> " + m.LabelProjects
 	}
 	b.WriteString(InputLabelStyle.Render(projLabel))
 	b.WriteString("\n")
@@ -1292,7 +1356,7 @@ func (a *App) renderTaskForm(title string) string {
 	projects := a.store.GetProjects()
 
 	if len(projects) == 0 {
-		b.WriteString(HelpDescStyle.Render("  (nenhum projeto cadastrado)"))
+		b.WriteString(HelpDescStyle.Render("  " + m.FormNoProjects))
 	} else {
 		var projectsList strings.Builder
 
@@ -1331,39 +1395,41 @@ func (a *App) renderTaskForm(title string) string {
 	b.WriteString("\n")
 
 	if a.focusedInput == 2 {
-		b.WriteString(HelpDescStyle.Render("j/k: navegar | Space: selecionar | Tab: proximo | Ctrl+S: salvar"))
+		b.WriteString(HelpDescStyle.Render(m.HintNavProjects))
 	} else {
-		b.WriteString(HelpDescStyle.Render("Tab: alternar campos | Ctrl+S: salvar | Esc: cancelar"))
+		b.WriteString(HelpDescStyle.Render(m.HintFormFields))
 	}
 
 	return b.String()
 }
 
 func (a *App) renderProjectForm(title string) string {
+	m := i18n.Get()
 	var b strings.Builder
 
 	b.WriteString(ModalTitleStyle.Render(title))
 	b.WriteString("\n\n")
 
-	b.WriteString(InputLabelStyle.Render("Nome do Projeto:"))
+	b.WriteString(InputLabelStyle.Render(m.FormProjectName))
 	b.WriteString("\n")
 	b.WriteString(a.nameInput.View())
 	b.WriteString("\n\n")
 
-	b.WriteString(HelpDescStyle.Render("Enter: confirmar | Esc: cancelar"))
+	b.WriteString(HelpDescStyle.Render(m.HintProjectForm))
 
 	return b.String()
 }
 
 func (a *App) renderAssociateProjectsModal() string {
+	m := i18n.Get()
 	projects := a.store.GetProjects()
 
 	if len(projects) == 0 {
-		return NormalItemStyle.Render("Nenhum projeto disponivel.\nCrie um projeto primeiro (p).")
+		return NormalItemStyle.Render(m.HintNoProjectAvail)
 	}
 
 	var b strings.Builder
-	b.WriteString(ModalTitleStyle.Render("Associar Projetos"))
+	b.WriteString(ModalTitleStyle.Render(m.ModalAssocProjects))
 	b.WriteString("\n\n")
 
 	for i, proj := range projects {
@@ -1393,53 +1459,55 @@ func (a *App) renderAssociateProjectsModal() string {
 	}
 
 	b.WriteString("\n")
-	b.WriteString(HelpDescStyle.Render("Space: selecionar | Enter: confirmar | Esc: cancelar"))
+	b.WriteString(HelpDescStyle.Render(m.HintAssocProjects))
 
 	a.projectsModalViewport.SetContent(b.String())
 	return a.projectsModalViewport.View()
 }
 
 func (a *App) renderHelpModal() string {
+	m := i18n.Get()
 	var b strings.Builder
 
-	b.WriteString(ModalTitleStyle.Render("Ajuda - Atalhos"))
+	b.WriteString(ModalTitleStyle.Render(m.ModalHelp))
 	b.WriteString("\n\n")
 
 	helpItems := [][]string{
-		{"Navegacao", ""},
-		{"j/k ou setas", "Mover na lista"},
-		{"Tab/Shift+Tab", "Alternar abas"},
-		{"P", "Tela de projetos"},
+		{m.HelpNavSection, ""},
+		{"j/k ou setas", m.HelpNavList},
+		{"Tab/Shift+Tab", m.HelpNavTabs},
+		{"P", m.HelpNavProjects},
 		{"", ""},
-		{"Tarefas", ""},
-		{"a", "Nova tarefa na aba atual"},
-		{"A", "Nova tarefa na Lista Geral"},
-		{"e", "Editar tarefa"},
-		{"d", "Deletar tarefa"},
-		{"space ou x", "Concluir/reabrir tarefa"},
-		{"D", "Deletar concluidas"},
-		{"p", "Associar projetos a tarefa"},
+		{m.HelpTaskSection, ""},
+		{"a", m.HelpTaskNew},
+		{"A", m.HelpTaskNewGen},
+		{"e", m.HelpTaskEdit},
+		{"d", m.HelpTaskDelete},
+		{"space ou x", m.HelpTaskComplete},
+		{"D", m.HelpTaskDeleteDone},
+		{"p", m.HelpTaskAssoc},
 		{"", ""},
-		{"Mover tarefa", ""},
-		{"1", "Mover para Hoje"},
-		{"2", "Mover para Essa Semana"},
-		{"3", "Mover para Nao Urgente"},
-		{"4", "Mover para Lista Geral"},
+		{m.HelpMoveSection, ""},
+		{"1", m.HelpMoveToday},
+		{"2", m.HelpMoveWeek},
+		{"3", m.HelpMoveNotUrgent},
+		{"4", m.HelpMoveGeneral},
 		{"", ""},
-		{"Projetos (tela P)", ""},
-		{"a", "Novo projeto"},
-		{"e", "Editar projeto"},
-		{"d", "Deletar projeto"},
-		{"space ou X", "Concluir projeto"},
+		{m.HelpProjSection, ""},
+		{"a", m.HelpProjNew},
+		{"e", m.HelpProjEdit},
+		{"d", m.HelpProjDelete},
+		{"space ou X", m.HelpProjComplete},
 		{"", ""},
-		{"Formularios", ""},
-		{"Tab", "Proximo campo"},
-		{"Ctrl+S", "Salvar"},
-		{"Esc", "Cancelar"},
+		{m.HelpFormSection, ""},
+		{"Tab", m.HelpFormTab},
+		{"Ctrl+S", m.HelpFormSave},
+		{"Esc", m.HelpFormCancel},
 		{"", ""},
-		{"Geral", ""},
-		{"?", "Mostrar/fechar ajuda"},
-		{"q ou Ctrl+C", "Sair"},
+		{m.HelpGeneralSection, ""},
+		{"?", m.HelpGeneralHelp},
+		{"L", m.HelpGeneralLanguage},
+		{"q ou Ctrl+C", m.HelpGeneralQuit},
 	}
 
 	for _, item := range helpItems {
@@ -1454,26 +1522,27 @@ func (a *App) renderHelpModal() string {
 	}
 
 	b.WriteString("\n")
-	b.WriteString(HelpDescStyle.Render("Pressione qualquer tecla para fechar"))
+	b.WriteString(HelpDescStyle.Render(m.HintCloseHelp))
 
 	a.helpModalViewport.SetContent(b.String())
 	return a.helpModalViewport.View()
 }
 
 func (a *App) renderConfirmDeleteModal() string {
+	m := i18n.Get()
 	var b strings.Builder
 
-	b.WriteString(ModalTitleStyle.Render("Confirmar Exclusao"))
+	b.WriteString(ModalTitleStyle.Render(m.ModalConfirmDelete))
 	b.WriteString("\n\n")
 
 	var message string
 	switch a.deleteType {
 	case "task":
-		message = "Deseja realmente deletar a tarefa?"
+		message = m.ConfirmDeleteTask
 	case "project":
-		message = "Deseja realmente deletar o projeto?"
+		message = m.ConfirmDeleteProject
 	case "completed":
-		message = "Deseja realmente deletar todas as tarefas concluidas?"
+		message = m.ConfirmDeleteCompleted
 	}
 
 	b.WriteString(DetailValueStyle.Render(message))
@@ -1482,9 +1551,53 @@ func (a *App) renderConfirmDeleteModal() string {
 	b.WriteString("\n\n")
 
 	b.WriteString(HelpKeyStyle.Render("S/Enter"))
-	b.WriteString(HelpDescStyle.Render(" confirmar   "))
+	b.WriteString(HelpDescStyle.Render(" " + m.ConfirmYes + "   "))
 	b.WriteString(HelpKeyStyle.Render("N/Esc"))
-	b.WriteString(HelpDescStyle.Render(" cancelar"))
+	b.WriteString(HelpDescStyle.Render(" " + m.ConfirmNo))
+
+	return b.String()
+}
+
+func (a *App) renderLanguageModal() string {
+	m := i18n.Get()
+	var b strings.Builder
+
+	b.WriteString(ModalTitleStyle.Render(m.ModalLanguage))
+	b.WriteString("\n\n")
+
+	b.WriteString(DetailLabelStyle.Render(m.LanguageSelect))
+	b.WriteString("\n\n")
+
+	langs := i18n.AvailableLanguages()
+	for i, lang := range langs {
+		var line string
+
+		if i == a.languageIndex {
+			line += CheckboxSelected
+		} else {
+			line += CheckboxNormal
+		}
+
+		currentLang := i18n.GetLanguage()
+		if lang == currentLang {
+			line += CheckboxChecked
+		} else {
+			line += CheckboxEmpty
+		}
+
+		var style lipgloss.Style
+		if i == a.languageIndex {
+			style = SelectedItemStyle
+		} else {
+			style = NormalItemStyle
+		}
+
+		line += style.Render(i18n.LanguageDisplayName(lang))
+		b.WriteString(line + "\n")
+	}
+
+	b.WriteString("\n")
+	b.WriteString(HelpDescStyle.Render(m.LanguageHint))
 
 	return b.String()
 }

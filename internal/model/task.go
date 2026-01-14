@@ -1,6 +1,7 @@
 package model
 
 import (
+	"t7t/internal/i18n"
 	"time"
 
 	"github.com/google/uuid"
@@ -16,15 +17,20 @@ const (
 )
 
 func (c Category) String() string {
+	return CategoryString(c)
+}
+
+func CategoryString(c Category) string {
+	m := i18n.Get()
 	switch c {
 	case CategoryToday:
-		return "Hoje"
+		return m.CategoryToday
 	case CategoryWeek:
-		return "Essa Semana"
+		return m.CategoryWeek
 	case CategoryNotUrgent:
-		return "Nao Urgente"
+		return m.CategoryNotUrgent
 	case CategoryGeneral:
-		return "Lista Geral"
+		return m.CategoryGeneral
 	default:
 		return string(c)
 	}

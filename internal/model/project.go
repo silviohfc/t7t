@@ -1,6 +1,7 @@
 package model
 
 import (
+	"t7t/internal/i18n"
 	"time"
 
 	"github.com/google/uuid"
@@ -45,7 +46,7 @@ func (p Project) Title() string {
 
 func (p Project) Description() string {
 	if p.Completed {
-		return "Concluido"
+		return i18n.Get().ProjectCompleted
 	}
 	return ""
 }
