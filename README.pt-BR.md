@@ -24,9 +24,9 @@ Um gerenciador de tarefas para terminal simples, rápido e sem firulas. Feito pa
 ### Build
 
 ```bash
-git clone https://github.com/yourusername/t7t.git
+git clone https://github.com/silviohfc/t7t.git
 cd t7t
-go build -o t7t ./cmd/t7t
+go build -o t7t .
 ```
 
 ### Adicionar ao PATH
@@ -125,7 +125,7 @@ Corrigir bug no auth @projeto-x
 
 As tags de contexto são destacadas em uma cor diferente, facilitando a identificação.
 
-## Idioma / Language
+## Idioma
 
 t7t suporta múltiplos idiomas. Pressione `L` (Shift+L) para abrir o modal de seleção de idioma e escolha entre:
 
