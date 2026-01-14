@@ -24,9 +24,9 @@ A simple, fast, and no-frills terminal task manager. Built for quick capture and
 ### Build
 
 ```bash
-git clone https://github.com/yourusername/t7t.git
+git clone https://github.com/silviohfc/t7t.git
 cd t7t
-go build -o t7t ./cmd/t7t
+go build -o t7t .
 ```
 
 ### Add to PATH
@@ -125,7 +125,7 @@ Fix bug in auth @project-x
 
 Context tags are highlighted in a different color, making them easy to spot.
 
-## Language / Idioma
+## Language
 
 t7t supports multiple languages. Press `L` (Shift+L) to open the language selection modal and choose between:
 
