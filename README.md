@@ -1,10 +1,11 @@
 # t7t
-
 A simple, fast, and no-frills terminal task manager. Built for quick capture and even quicker planning.
+
+<img width="1899" height="1059" alt="image" src="https://github.com/user-attachments/assets/c52ce8b9-27e6-444b-aa3e-654fef4aa487" />
 
 > **Vibe-coded with [Claude Code](https://claude.ai/code)**
 
-[Leia em Portugues](README.pt-BR.md)
+[Leia em Português](README.pt-BR.md)
 
 ## Features
 
