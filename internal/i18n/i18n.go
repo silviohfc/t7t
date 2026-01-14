@@ -572,7 +572,7 @@ func getConfigPath() string {
 	if err != nil {
 		return ""
 	}
-	return filepath.Join(homeDir, ".config", "t7t", "language.json")
+	return filepath.Join(homeDir, ".t7t", "language.json")
 }
 
 func loadSavedLanguage() {

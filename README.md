@@ -133,7 +133,7 @@ t7t supports multiple languages. Press `L` (Shift+L) to open the language select
 - **English**
 - **Portugues (Brasil)**
 
-Your language preference is saved automatically in `~/.config/t7t/language.json`.
+Your language preference is saved automatically in `~/.t7t/language.json`.
 
 ## Built With
 

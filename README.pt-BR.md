@@ -132,7 +132,7 @@ t7t suporta múltiplos idiomas. Pressione `L` (Shift+L) para abrir o modal de se
 - **Português (Brasil)**
 - **English**
 
-Sua preferência de idioma é salva automaticamente em `~/.config/t7t/language.json`.
+Sua preferência de idioma é salva automaticamente em `~/.t7t/language.json`.
 
 ## Construído Com
 
