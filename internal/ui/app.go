@@ -2,6 +2,7 @@ package ui
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 
@@ -195,9 +196,15 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.confettiSystem.Frame.Width = msg.Width
 		a.confettiSystem.Frame.Height = msg.Height
 
+		// Calculate consistent header height:
+		// logo (4) + gap (1) + tabs (1) + gap (1) + status (2) + panel border/padding (4)
+		headerAndFooter := 13
 		listWidth := a.width*60/100 - 4
 		detailWidth := a.width*40/100 - 4
-		contentHeight := a.height - 10
+		contentHeight := a.height - headerAndFooter
+		if contentHeight < 5 {
+			contentHeight = 5
+		}
 		a.taskListViewport = viewport.New(listWidth, contentHeight)
 		a.taskDetailViewport = viewport.New(detailWidth, contentHeight)
 		a.projectListViewport = viewport.New(a.width-4, contentHeight)
@@ -862,18 +869,27 @@ func (a *App) renderConfettiOverlay(base string) string {
 }
 
 func (a *App) viewTasks() string {
-	var b strings.Builder
+	// Render header elements
+	logo := LogoStyle.Render(LogoArt)
+	tabs := a.renderTabs()
 
-	title := TitleStyle.Render("t7t - Gerenciador de Tarefas")
-	b.WriteString(title)
-	b.WriteString("\n\n")
+	// Calculate heights
+	logoHeight := lipgloss.Height(logo)
+	tabsHeight := lipgloss.Height(tabs)
+	statusHeight := 2
+	gaps := 2               // empty lines between elements
+	panelBorderPadding := 4 // border (2) + padding (2) from ListPanelStyle
 
-	b.WriteString(a.renderTabs())
-	b.WriteString("\n\n")
+	headerHeight := logoHeight + tabsHeight + gaps
+	contentHeight := a.height - headerHeight - statusHeight - panelBorderPadding
 
+	if contentHeight < 5 {
+		contentHeight = 5
+	}
+
+	// Render panels
 	listWidth := a.width*60/100 - 4
 	detailWidth := a.width*40/100 - 4
-	contentHeight := a.height - 10
 
 	tasks := a.store.GetTasksByCategory(a.categories[a.activeTab])
 
@@ -895,12 +911,17 @@ func (a *App) viewTasks() string {
 	detailPanel := detailStyle.Render(a.taskDetailViewport.View())
 
 	panels := lipgloss.JoinHorizontal(lipgloss.Top, listPanel, detailPanel)
-	b.WriteString(panels)
-	b.WriteString("\n")
+	statusBar := a.renderStatusBar()
 
-	b.WriteString(a.renderStatusBar())
-
-	return b.String()
+	// Join all elements vertically
+	return lipgloss.JoinVertical(lipgloss.Left,
+		logo,
+		"",
+		tabs,
+		"",
+		panels,
+		statusBar,
+	)
 }
 
 func (a *App) renderTabs() string {
@@ -922,9 +943,41 @@ func (a *App) renderTabs() string {
 	return lipgloss.JoinHorizontal(lipgloss.Center, tabs...)
 }
 
+// contextRegex matches @word patterns (contexts)
+var contextRegex = regexp.MustCompile(`@[\w-]+`)
+
+// renderNameWithContexts renders a task name with context tags (@tag) highlighted
+func renderNameWithContexts(name string, baseStyle lipgloss.Style) string {
+	matches := contextRegex.FindAllStringIndex(name, -1)
+	if len(matches) == 0 {
+		return baseStyle.Render(name)
+	}
+
+	var result strings.Builder
+	lastEnd := 0
+
+	for _, match := range matches {
+		start, end := match[0], match[1]
+		// Render text before the context
+		if start > lastEnd {
+			result.WriteString(baseStyle.Render(name[lastEnd:start]))
+		}
+		// Render the context with ContextStyle
+		result.WriteString(ContextStyle.Render(name[start:end]))
+		lastEnd = end
+	}
+
+	// Render remaining text after last context
+	if lastEnd < len(name) {
+		result.WriteString(baseStyle.Render(name[lastEnd:]))
+	}
+
+	return result.String()
+}
+
 func (a *App) renderTaskList(tasks []*model.Task, width, height int) string {
 	if len(tasks) == 0 {
-		return NormalItemStyle.Render("Nenhuma tarefa nesta lista.\n\nPressione 'n' para criar uma nova tarefa.")
+		return NormalItemStyle.Render("Nenhuma tarefa nesta lista.\n\nPressione 'a' para criar uma nova tarefa.")
 	}
 
 	var lines []string
@@ -971,7 +1024,7 @@ func (a *App) renderTaskList(tasks []*model.Task, width, height int) string {
 			style = NormalItemStyle
 		}
 
-		line += style.Render(name)
+		line += renderNameWithContexts(name, style)
 
 		if projectsStr != "" {
 			line += ProjectNamesStyle.Render(projectsStr)
@@ -991,7 +1044,7 @@ func (a *App) renderTaskDetail(tasks []*model.Task, width, height int) string {
 	task := tasks[a.taskIndex]
 	var b strings.Builder
 
-	b.WriteString(DetailTitleStyle.Render(task.Name))
+	b.WriteString(DetailTitleStyle.Width(width).Render(task.Name))
 	b.WriteString("\n\n")
 
 	b.WriteString(DetailLabelStyle.Render("Status: "))
@@ -1035,30 +1088,38 @@ func (a *App) renderTaskDetail(tasks []*model.Task, width, height int) string {
 }
 
 func (a *App) viewProjects() string {
-	var b strings.Builder
+	// Render header elements
+	logo := LogoStyle.Render(LogoArt)
+	tab := InactiveTabStyle.Render("[P] Voltar para Tarefas")
 
-	title := TitleStyle.Render("t7t - Projetos")
-	b.WriteString(title)
-	b.WriteString("\n\n")
+	// Calculate heights
+	logoHeight := lipgloss.Height(logo)
+	tabHeight := lipgloss.Height(tab)
+	statusHeight := 2
+	gaps := 2               // empty lines between elements
+	panelBorderPadding := 4 // border (2) + padding (2) from ListPanelStyle
 
-	b.WriteString(InactiveTabStyle.Render("[P] Voltar para Tarefas"))
-	b.WriteString("\n\n")
+	headerHeight := logoHeight + tabHeight + gaps
+	contentHeight := a.height - headerHeight - statusHeight - panelBorderPadding
 
+	if contentHeight < 5 {
+		contentHeight = 5
+	}
+
+	// Render content
 	projects := a.store.GetProjects()
-	contentHeight := a.height - 10
+	var panel string
 
 	if len(projects) == 0 {
-		b.WriteString(NormalItemStyle.Render("Nenhum projeto cadastrado.\n\nPressione 'p' para criar um novo projeto."))
+		panel = NormalItemStyle.Render("Nenhum projeto cadastrado.\n\nPressione 'a' para criar um novo projeto.")
 	} else {
 		listWidth := a.width - 4
 		listContent := a.renderProjectList(projects, listWidth)
 		a.projectListViewport.SetContent(listContent)
-		listPanel := ListPanelStyle.Width(listWidth).Height(contentHeight).Render(a.projectListViewport.View())
-		b.WriteString(listPanel)
+		panel = ListPanelStyle.Width(listWidth).Height(contentHeight).Render(a.projectListViewport.View())
 	}
 
-	b.WriteString("\n")
-
+	// Render status bar
 	var parts []string
 	if a.statusMsg != "" {
 		parts = append(parts, StatusMessageStyle.Render(a.statusMsg))
@@ -1072,9 +1133,17 @@ func (a *App) viewProjects() string {
 		HelpKeyStyle.Render("q") + HelpDescStyle.Render(":sair")
 
 	parts = append(parts, helpText)
-	b.WriteString(StatusBarStyle.Render(strings.Join(parts, " | ")))
+	statusBar := StatusBarStyle.Render(strings.Join(parts, " | "))
 
-	return b.String()
+	// Join all elements vertically
+	return lipgloss.JoinVertical(lipgloss.Left,
+		logo,
+		"",
+		tab,
+		"",
+		panel,
+		statusBar,
+	)
 }
 
 func (a *App) renderProjectList(projects []*model.Project, width int) string {

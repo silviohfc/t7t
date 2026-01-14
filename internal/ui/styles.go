@@ -138,9 +138,24 @@ var (
 				Background(secondaryColor).
 				Padding(0, 1)
 
+	// ASCII Art Logo
+	LogoStyle = lipgloss.NewStyle().
+			Foreground(primaryColor).
+			Bold(true)
+
+	// ASCII Art for t7t
+	LogoArt = `  __ ______
+ / //_  / /_
+/ __// / __/
+\__//_/\__/ `
+
 	// Project names in task list
 	ProjectNamesStyle = lipgloss.NewStyle().
 				Foreground(mutedColor)
+
+	// Context tags (@tag) in task names
+	ContextStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#FF79C6")) // Pink/Magenta
 
 	// Category badges
 	CategoryTodayStyle = lipgloss.NewStyle().
